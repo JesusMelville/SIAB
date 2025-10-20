@@ -1,0 +1,89 @@
+<div class="upload-container">
+  <div class="upload-header">
+    <button class="btn-back" (click)="goBack()">← Volver</button>
+    <h1>Cargar y Analizar Tesis</h1>
+  </div>
+
+  <div *ngIf="error" class="alert alert-error">{{ error }}</div>
+
+  <form [formGroup]="thesisForm" (ngSubmit)="onSubmit()" class="upload-form">
+    
+    <div class="upload-card">
+      <h2>1. Sube tu Tesis en PDF</h2>
+      <p class="upload-description">El sistema intentará leer los metadatos del archivo para autocompletar el formulario.</p>
+      
+      <div class="file-upload-area">
+        <input type="file" #fileInput accept=".pdf" (change)="onFileSelected($event)" [disabled]="uploading" hidden />
+        
+        <div *ngIf="!selectedFile" 
+             class="upload-zone" 
+             [class.drag-over]="isDragging"
+             (dragover)="onDragOver($event)"
+             (dragleave)="onDragLeave($event)"
+             (drop)="onDrop($event)"
+             (click)="!uploading && triggerFileInput(fileInput)" 
+             (keydown.enter)="!uploading && triggerFileInput(fileInput)" role="button" tabindex="0" aria-label="Seleccionar archivo PDF para cargar">
+          <div class="upload-icon">📁</div>
+          <p class="upload-text">Haz clic o arrastra el archivo PDF aquí</p>
+          <p class="upload-subtext">Tamaño máximo: 50MB</p>
+        </div>
+
+        <div *ngIf="selectedFile" class="file-selected">
+          <div class="file-info">
+            <div class="file-icon">📄</div>
+            <div class="file-details">
+              <p class="file-name">{{ selectedFile.name }}</p>
+              <p class="file-size">{{ formatFileSize(selectedFile.size) }}</p>
+            </div>
+            <button type="button" class="btn-remove" (click)="removeFile()" [disabled]="uploading" aria-label="Eliminar archivo">✕</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-card" *ngIf="selectedFile">
+      <h2>2. Verifica los Datos de la Tesis</h2>
+      <div class="form-grid">
+        <div class="form-group full-width">
+          <label for="titulo">Título de la Tesis</label>
+          <textarea id="titulo" formControlName="titulo" class="form-control" rows="3" placeholder="Ingresa el título de la tesis" [class.is-invalid]="titulo?.invalid && (titulo?.touched || titulo?.dirty)"></textarea>
+          <div *ngIf="titulo?.invalid && (titulo?.touched || titulo?.dirty)" class="error-text">
+            <small *ngIf="titulo?.hasError('required')">El título es obligatorio.</small>
+            <small *ngIf="titulo?.hasError('minlength')">El título debe tener al menos 10 caracteres.</small>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="autor">Autor(es)</label>
+          <input id="autor" type="text" formControlName="autor" class="form-control" placeholder="Ingresa el autor" [class.is-invalid]="autor?.invalid && (autor?.touched || autor?.dirty)" />
+          <div *ngIf="autor?.invalid && (autor?.touched || autor?.dirty)" class="error-text">
+            <small *ngIf="autor?.hasError('required')">El autor es obligatorio.</small>
+            <small *ngIf="autor?.hasError('minlength')">El autor debe tener al menos 5 caracteres.</small>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="anio">Año de Publicación</label>
+          <input id="anio" type="number" formControlName="anio" class="form-control" placeholder="Ingresa el año" [class.is-invalid]="anio?.invalid && (anio?.touched || anio?.dirty)" />
+          <div *ngIf="anio?.invalid && (anio?.touched || anio?.dirty)" class="error-text">
+            <small *ngIf="anio?.hasError('required')">El año es obligatorio.</small>
+            <small *ngIf="anio?.hasError('min') || anio?.hasError('max')">El año no es válido.</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-card" *ngIf="selectedFile">
+      <div *ngIf="uploading" class="progress-container">
+        <p class="progress-text" role="status" aria-live="polite">Analizando y procesando... {{ uploadProgress }}%</p>
+        <div class="progress-bar">
+          <div class="progress-fill" [style.width.%]="uploadProgress"></div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-upload" [disabled]="uploading || thesisForm.invalid">
+        <span *ngIf="!uploading">🚀 Procesar y Analizar Tesis</span>
+        <span *ngIf="uploading">⏳ Procesando...</span>
+      </button>
+    </div>
+
+  </form>
+</div>

@@ -1,0 +1,87 @@
+<!-- Ocultamos el contenido si es una descarga silenciosa para que el usuario no vea el parpadeo -->
+<div class="diagnostic-container" [hidden]="isSilentDownload">
+  <div class="diagnostic-header">
+    <button class="btn-back" (click)="goBack()">← Volver al Dashboard</button>
+    <h1>Diagnóstico de Tesis</h1>
+    <!-- 1. Botón para descargar el reporte del diagnóstico -->
+    <button class="btn-download" (click)="downloadReport()" *ngIf="!loading && thesis" title="Descargar reporte en PDF">
+      ↓ Descargar Reporte
+    </button>
+  </div>
+
+  <div *ngIf="loading" class="loading-container" role="status" aria-live="polite">
+    <div class="spinner-large"></div>
+    <p>Cargando diagnóstico...</p>
+  </div>
+  <div *ngIf="error && !loading" class="alert alert-error">{{ error }}</div>
+
+  <!-- 2. ID añadido para poder capturar este elemento -->
+  <div *ngIf="!loading && thesis && metrics" class="diagnostic-content" id="diagnosticReport">
+    
+    <div class="summary-card">
+      <div class="summary-score">
+        <p class="score-value">{{ metrics.puntajes.total | number:'1.0-1' }}<span>/100</span></p>
+        <p class="score-label">Puntaje Total</p>
+      </div>
+      <div class="summary-details">
+        <h2>{{ thesis.titulo }}</h2>
+        <p class="author-info">Por {{ thesis.autor }} - {{ thesis.anio }}</p>
+        <div class="category-badge" [ngClass]="metrics.prediccionIA.categoria.toLowerCase()">
+          {{ metrics.prediccionIA.categoria }}
+        </div>
+      </div>
+    </div>
+
+    <!-- NUEVA SECCIÓN: Resumen del Análisis -->
+    <div class="analysis-summary-card">
+      <h3>Resumen del Análisis</h3>
+      <p>
+        La tesis ha obtenido una calificación de <strong>{{ metrics.prediccionIA.categoria }}</strong> con un puntaje total de <strong>{{ metrics.puntajes.total | number:'1.0-1' }}</strong>.
+        El análisis de los indicadores muestra que las áreas más fuertes son <strong>{{ getStrongestArea() }}</strong>, mientras que el área con mayor oportunidad de mejora es <strong>{{ getWeakestArea() }}</strong>.
+        A continuación, se presenta un desglose detallado y recomendaciones específicas para fortalecer el trabajo.
+      </p>
+    </div>
+
+    <div class="diagnostic-grid">
+      
+      <div class="chart-card">
+        <h3>Desglose de Puntajes</h3>
+
+        <!-- 1. Nueva cuadrícula para mostrar cada puntaje individualmente -->
+        <div class="scores-grid">
+          <div class="score-item" *ngFor="let score of getIndividualScores()">
+            <p class="score-item-value">{{ score.value | number:'1.0-1' }}</p>
+            <p class="score-item-label">{{ score.label }}</p>
+            <div class="score-item-bar">
+              <div class="score-item-fill" [style.width.%]="score.value || 0"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. El gráfico ahora aparece debajo del desglose detallado -->
+        <h4 class="chart-title">Visualización de Métricas</h4>
+        <div class="chart-wrapper">
+          <canvas baseChart
+            [data]="radarChartData"
+            [options]="radarChartOptions"
+            [type]="radarChartType">
+          </canvas>
+        </div>
+      </div>
+
+      <div class="recommendations-card">
+        <h3>Recomendaciones Clave</h3>
+        <div *ngIf="metrics.recomendaciones && metrics.recomendaciones.length > 0" class="recommendations-list">
+          <div *ngFor="let rec of metrics.recomendaciones" class="rec-item">
+            <span class="rec-priority" [ngClass]="rec.prioridad.toLowerCase()">{{ rec.prioridad }}</span>
+            <p class="rec-text">{{ rec.texto }}</p>
+          </div>
+        </div>
+        <div *ngIf="!metrics.recomendaciones || metrics.recomendaciones.length === 0" class="no-recommendations">
+          <p>¡Excelente trabajo! No se han generado recomendaciones prioritarias.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>

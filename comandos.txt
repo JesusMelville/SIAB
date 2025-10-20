@@ -1,0 +1,3 @@
+angular - ng serve
+node - npm run start
+python - python api_ml.py

@@ -1,0 +1,289 @@
+/* src/app/features/diagnostic/diagnostic.component.css */
+.diagnostic-container {
+  min-height: 100vh;
+  background-color: #f7fafc;
+  padding: 24px;
+}
+
+.diagnostic-header {
+  max-width: 1200px;
+  margin: 0 auto 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.btn-back {
+  padding: 10px 20px;
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #4a5568;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-back:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.diagnostic-header h1 {
+  flex-grow: 1; /* Hace que el título ocupe el espacio disponible */
+}
+
+.btn-download {
+  padding: 10px 20px;
+  background: #48bb78; /* Un color verde para la acción positiva */
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-left: auto; /* Empuja el botón a la derecha */
+}
+
+.btn-download:hover {
+  background: #38a169;
+  transform: translateY(-1px);
+}
+
+h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0;
+}
+
+/* Loading y Errores */
+.loading-container { text-align: center; padding: 80px 0; }
+.spinner-large { width: 50px; height: 50px; border: 4px solid #e2e8f0; border-top-color: #667eea; border-radius: 50%; margin: 0 auto 16px; animation: spin 0.8s linear infinite; }
+.alert-error { max-width: 1200px; margin: 0 auto 24px; padding: 16px; background-color: #fed7d7; color: #c53030; border-radius: 8px; }
+
+/* Contenido Principal */
+.diagnostic-content {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.summary-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 16px;
+  padding: 32px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+}
+
+.summary-score {
+  text-align: center;
+  border-right: 2px solid rgba(255, 255, 255, 0.3);
+  padding-right: 32px;
+}
+
+.score-value {
+  font-size: 64px;
+  font-weight: 800;
+  margin: 0;
+  line-height: 1;
+}
+
+.score-value span {
+  font-size: 24px;
+  font-weight: 500;
+  opacity: 0.8;
+  margin-left: 4px;
+}
+
+.score-label {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 8px 0 0 0;
+  opacity: 0.9;
+}
+
+.summary-details h2 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+}
+
+.author-info {
+  font-size: 16px;
+  opacity: 0.9;
+  margin: 0 0 16px 0;
+}
+
+.category-badge {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.2);
+}
+.category-badge.excelente { background: #48bb78; }
+.category-badge.buena { background: #4299e1; }
+.category-badge.regular { background: #ed8936; }
+.category-badge.deficiente { background: #f56565; }
+
+/* Estilos para la nueva tarjeta de resumen */
+.analysis-summary-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.analysis-summary-card h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0 0 16px 0;
+}
+
+.analysis-summary-card p {
+  font-size: 15px;
+  line-height: 1.7;
+  color: #4a5568;
+}
+
+.diagnostic-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.chart-card, .recommendations-card {
+  background: white;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.chart-card h3, .recommendations-card h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0 0 24px 0;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* --- Nuevos Estilos para el Desglose de Puntajes --- */
+.scores-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.score-item {
+  background-color: #f7fafc;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  border: 1px solid #e2e8f0;
+}
+
+.score-item-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #667eea;
+  margin: 0;
+}
+
+.score-item-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #718096;
+  margin: 4px 0 12px 0;
+}
+
+.score-item-bar {
+  height: 6px;
+  background-color: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.score-item-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #a3bffa 0%, #667eea 100%);
+  border-radius: 3px;
+  transition: width 0.5s ease-out;
+}
+
+.chart-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #4a5568;
+  margin-top: 24px;
+  margin-bottom: 16px;
+}
+
+.chart-wrapper {
+  position: relative;
+  height: 300px; /* Ajusta la altura según necesites */
+}
+
+.recommendations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rec-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.rec-priority {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.rec-priority.alta { background: #fed7d7; color: #c53030; }
+.rec-priority.media { background: #feebc8; color: #9c4221; }
+.rec-priority.baja { background: #c6f6d5; color: #22543d; }
+
+.rec-text {
+  font-size: 14px;
+  color: #4a5568;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.no-recommendations { text-align: center; padding: 40px; color: #718096; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 992px) {
+  .diagnostic-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 768px) {
+  .summary-card {
+    flex-direction: column;
+    text-align: center;
+  }
+  .summary-score {
+    border-right: none;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+    padding-right: 0;
+    padding-bottom: 24px;
+    margin-bottom: 24px;
+  }
+}
