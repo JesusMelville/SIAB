@@ -13,6 +13,9 @@ import {
   setClassMetadata,
   ɵɵdefineInjectable
 } from "./chunk-PLTLOC4I.js";
+import "./chunk-WPM5VTLQ.js";
+import "./chunk-PEBH6BBU.js";
+import "./chunk-4S3KYZTJ.js";
 import {
   __objRest,
   __spreadValues
@@ -4080,32 +4083,31 @@ var AnimationRendererFactory = class {
     this.delegate.componentReplaced?.(componentId);
   }
 };
-
 export {
-  getParentElement,
-  validateStyleProperty,
-  validateWebAnimatableStyleProperty,
-  containsElement,
-  invokeQuery,
-  ENTER_CLASSNAME,
-  LEAVE_CLASSNAME,
-  normalizeKeyframes,
-  camelCaseToDashCase,
-  allowPreviousPlayerStylesMerge,
-  NoopAnimationDriver,
   AnimationDriver,
-  AnimationStyleNormalizer,
-  NoopAnimationStyleNormalizer,
-  WebAnimationsStyleNormalizer,
-  TransitionAnimationPlayer,
-  AnimationEngine,
-  WebAnimationsPlayer,
-  WebAnimationsDriver,
-  createEngine,
-  Animation,
-  BaseAnimationRenderer,
-  AnimationRenderer,
-  AnimationRendererFactory
+  NoopAnimationDriver,
+  Animation as ɵAnimation,
+  AnimationEngine as ɵAnimationEngine,
+  AnimationRenderer as ɵAnimationRenderer,
+  AnimationRendererFactory as ɵAnimationRendererFactory,
+  AnimationStyleNormalizer as ɵAnimationStyleNormalizer,
+  BaseAnimationRenderer as ɵBaseAnimationRenderer,
+  ENTER_CLASSNAME as ɵENTER_CLASSNAME,
+  LEAVE_CLASSNAME as ɵLEAVE_CLASSNAME,
+  NoopAnimationStyleNormalizer as ɵNoopAnimationStyleNormalizer,
+  TransitionAnimationPlayer as ɵTransitionAnimationPlayer,
+  WebAnimationsDriver as ɵWebAnimationsDriver,
+  WebAnimationsPlayer as ɵWebAnimationsPlayer,
+  WebAnimationsStyleNormalizer as ɵWebAnimationsStyleNormalizer,
+  allowPreviousPlayerStylesMerge as ɵallowPreviousPlayerStylesMerge,
+  camelCaseToDashCase as ɵcamelCaseToDashCase,
+  containsElement as ɵcontainsElement,
+  createEngine as ɵcreateEngine,
+  getParentElement as ɵgetParentElement,
+  invokeQuery as ɵinvokeQuery,
+  normalizeKeyframes as ɵnormalizeKeyframes,
+  validateStyleProperty as ɵvalidateStyleProperty,
+  validateWebAnimatableStyleProperty as ɵvalidateWebAnimatableStyleProperty
 };
 /*! Bundled license information:
 
@@ -4117,4 +4119,4 @@ export {
    * License: MIT
    *)
 */
-//# sourceMappingURL=chunk-SM6LZNZP.js.map
+//# sourceMappingURL=browser-A4L2ELJ4.js.map
