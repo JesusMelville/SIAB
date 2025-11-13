@@ -1,19 +1,17 @@
-import { HttpEvent, HttpInterceptorFn, HttpRequest, HttpHandlerFn } from '@angular/common/http';
-import { inject } from '@angular/core';
-import { Observable } from 'rxjs';
-import { AuthService } from '../services/auth.service';
+import { HttpInterceptorFn } from '@angular/common/http';
 
-/**
- * Interceptor funcional que añade el token de autenticación a las peticiones salientes.
- */
-export const authInterceptor: HttpInterceptorFn = (req: HttpRequest<unknown>, next: HttpHandlerFn): Observable<HttpEvent<unknown>> => {
-  const authService = inject(AuthService);
-  const token = authService.getToken();
+export const AuthInterceptor: HttpInterceptorFn = (req, next) => {
+  const token = localStorage.getItem('token');
 
+  // solo añadimos si hay token
   if (token) {
-    // Clona la petición para añadir la nueva cabecera de autorización.
-    const clonedReq = req.clone({ headers: req.headers.set('Authorization', `Bearer ${token}`) });
-    return next(clonedReq);
+    const authReq = req.clone({
+      setHeaders: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return next(authReq);
   }
+
   return next(req);
 };

@@ -1,7 +1,7 @@
 // src/routes/dashboard.routes.js
 const express = require('express');
 const router = express.Router();
-const authMiddleware = require('../middleware/authMiddleware'); // middleware JWT
+const authMiddleware = require('../middleware/authMiddleware');
 const User = require('../models/user.model');
 
 // Ruta protegida: obtener datos del dashboard

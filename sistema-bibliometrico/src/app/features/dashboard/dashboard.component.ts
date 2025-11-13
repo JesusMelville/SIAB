@@ -2,184 +2,183 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { trigger, transition, style, animate, query, stagger } from '@angular/animations';
+import { DashboardService } from '../../core/services/dashboard.service';
 import { ThesisService } from '../../core/services/thesis.service';
-import { AuthService } from '../../core/services/auth.service';
-import { ToastService } from '../../core/services/toast.service';
 import { DownloadService } from '../../core/services/download.service';
-import { Thesis } from '../../core/models/thesis.model';
+import { AuthService } from '../../core/services/auth.service';
 import { Statistics } from '../../core/models/statistics.model';
-import { User } from '../../core/models/user.model';
-import { ApiResponse } from '../../core/models/api-response.model';
+import { Thesis } from '../../core/models/thesis.model';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: './dashboard.component.html',
-  styleUrls: ['./dashboard.component.css'],
-  animations: [
-    trigger('listAnimation', [
-      transition('* => *', [ // Se activa cada vez que cambia el estado de la lista
-        query(':enter', [ // Selecciona los nuevos elementos que entran en el DOM
-          style({ transform: 'translateY(20px)', opacity: 0 }),
-          stagger('100ms', [ // Aplica un retraso de 100ms entre cada elemento
-            animate('0.5s ease-out', style({ transform: 'translateY(0)', opacity: 1 }))
-          ])
-        ], { optional: true })
-      ])
-    ])
-  ]
+  styleUrls: ['./dashboard.component.css']
 })
 export class DashboardComponent implements OnInit {
-  Math = Math;
+  Math = Math; // para el template
 
-  thesisList: Thesis[] = [];
+  currentUser: any = null;
+
   statistics: Statistics = {
     total: 0,
     promedio: 0,
     categorias: {},
-    thisMonth: 0
+    thisMonth: 0,
   };
+
+  allTheses: Thesis[] = [];
+  viewTheses: Thesis[] = [];
   loading = true;
-  currentUser: User | null;
-
-  currentPage = 1;
-  pageSize = 10;
-  totalPages = 0;
-  totalTheses = 0;
-
-  isDownloading = false;
 
   searchTerm = '';
   selectedYear: number | null = null;
-  years: number[] = Array.from({ length: 16 }, (_, i) => new Date().getFullYear() - i);
+  years: number[] = [];
+
+  pageSize = 10;
+  currentPage = 1;
+  totalPages = 1;
+  isDownloading = false;
 
   constructor(
+    private dashboardService: DashboardService,
     private thesisService: ThesisService,
-    private authService: AuthService,
-    private router: Router,
     private downloadService: DownloadService,
-    private toastService: ToastService // ✅ Inyectar el servicio de toast
-  ) {
-    this.currentUser = this.authService.currentUserValue;
-  }
+    private authService: AuthService,
+    private router: Router
+  ) {}
 
   ngOnInit(): void {
-    this.loadStatistics();
+    this.currentUser = this.authService.currentUserValue;
+    this.loadStats();
     this.loadTheses();
   }
 
-  loadStatistics(): void {
-    this.thesisService.getStatistics().subscribe({
-      next: (res: ApiResponse<Statistics>) => {
-        if (res.success && res.data) this.statistics = res.data;
+  private loadStats(): void {
+    this.dashboardService.getMyStats().subscribe({
+      next: (res) => {
+        const data = res.data || (res as any);
+        this.statistics = {
+          total: data.total ?? 0,
+          promedio: data.promedio ?? 0,
+          categorias: data.categorias ?? {},
+          thisMonth: data.thisMonth ?? 0,
+        };
       },
-      error: (err: any) => console.error('Error al cargar estadísticas:', err)
     });
   }
 
-  loadTheses(): void {
+  private loadTheses(): void {
     this.loading = true;
-    const filters: Record<string, any> = {};
-    if (this.selectedYear) filters['anio'] = this.selectedYear;
-    if (this.searchTerm.trim()) filters['search'] = this.searchTerm.trim();
-
-    this.thesisService.getAllTheses(this.currentPage, this.pageSize, filters).subscribe({
-      next: (res: ApiResponse<Thesis[]>) => {
-        if (res.success && res.data) {
-          this.thesisList = res.data;
-          this.totalTheses = res.pagination?.total ?? 0;
-          this.totalPages = res.pagination?.pages ?? 0;
-        }
+    this.thesisService.getMyTheses().subscribe({
+      next: (res) => {
+        const data = res.data || (res as any);
+        this.allTheses = data || [];
+        this.years = Array.from(
+          new Set(this.allTheses.map((t) => t.anio).filter(Boolean))
+        ).sort((a, b) => b - a);
+        this.applyFilters();
         this.loading = false;
       },
-      error: (err: any) => {
-        console.error('Error al cargar tesis:', err);
+      error: () => {
         this.loading = false;
-      }
+      },
     });
   }
 
-  // --- Filtros y paginación ---
-  onSearch(): void { this.currentPage = 1; this.loadTheses(); }
-  onFilterChange(): void { this.currentPage = 1; this.loadTheses(); }
+  get thesisList(): Thesis[] {
+    return this.viewTheses;
+  }
+
+  get totalTheses(): number {
+    return this.allTheses.length;
+  }
+
+  applyFilters(): void {
+    let list = [...this.allTheses];
+    if (this.searchTerm) {
+      const term = this.searchTerm.toLowerCase();
+      list = list.filter(
+        (t) =>
+          t.titulo.toLowerCase().includes(term) ||
+          t.autor.toLowerCase().includes(term)
+      );
+    }
+    if (this.selectedYear) {
+      list = list.filter((t) => t.anio === this.selectedYear);
+    }
+    this.totalPages = Math.max(1, Math.ceil(list.length / this.pageSize));
+    const start = (this.currentPage - 1) * this.pageSize;
+    const end = start + this.pageSize;
+    this.viewTheses = list.slice(start, end);
+  }
+
+  onSearch(): void {
+    this.currentPage = 1;
+    this.applyFilters();
+  }
+
+  onFilterChange(): void {
+    this.currentPage = 1;
+    this.applyFilters();
+  }
+
   clearFilters(): void {
     this.searchTerm = '';
     this.selectedYear = null;
     this.currentPage = 1;
-    this.loadTheses();
+    this.applyFilters();
   }
+
   goToPage(page: number): void {
-    if (page >= 1 && page <= this.totalPages) {
-      this.currentPage = page;
-      this.loadTheses();
-    }
+    if (page < 1 || page > this.totalPages) return;
+    this.currentPage = page;
+    this.applyFilters();
   }
 
-  // --- Acciones del usuario ---
-  viewDiagnostic(thesisId: string): void { this.router.navigate(['/diagnostic', thesisId]); }
-  
-  downloadDiagnostic(thesis: Thesis): void {
-    if (!thesis._id) return;
+  truncateText(text: string, max: number): string {
+    if (!text) return '';
+    return text.length > max ? text.slice(0, max) + '…' : text;
+  }
+
+  viewDiagnostic(id: string): void {
+    this.router.navigate(['/diagnostic', id]);
+  }
+
+  downloadDiagnostic(t: Thesis): void {
+    if (!t._id) return;
     this.isDownloading = true;
+    this.downloadService.downloadThesisPdf(t._id, t.fileName);
+    this.isDownloading = false;
+  }
 
-    // Nos suscribimos para saber cuándo termina la descarga
-    const sub = this.downloadService.downloadComplete$.subscribe(() => {
-      this.isDownloading = false;
-      sub.unsubscribe();
-    });
-
-    // Navegamos a la página de diagnóstico y pasamos un query param para iniciar la descarga.
-    this.router.navigate(['/diagnostic', thesis._id], { 
-      queryParams: { download: 'true', redirect: 'true' } 
+  deleteThesis(id: string): void {
+    if (!id) return;
+    this.thesisService.delete(id).subscribe({
+      next: () => this.loadTheses(),
     });
   }
 
-  goToUpload(): void { this.router.navigate(['/upload']); }
-  logout(): void { this.authService.logout(); }
-
-  // --- Helpers ---
-  truncateText(text: string, maxLength: number): string {
-    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+  goToUpload(): void {
+    this.router.navigate(['/upload']);
   }
 
-  getCategoryClass(category: string): string {
-    switch (category?.toLowerCase()) {
-      case 'excelente': return 'badge-excellent';
-      case 'buena': return 'badge-good';
-      case 'regular': return 'badge-regular';
-      case 'deficiente': return 'badge-poor';
-      default: return '';
+  getCategoryClass(cat: string): string {
+    switch (cat) {
+      case 'Excelente':
+        return 'badge-excellent';
+      case 'Buena':
+        return 'badge-good';
+      case 'Regular':
+        return 'badge-regular';
+      default:
+        return 'badge-bad';
     }
   }
 
-  // En tu archivo dashboard.component.ts
-  
-    // ... (asegúrate de que ThesisService esté inyectado en tu constructor)
-  
-    // ... (tus otros métodos como ngOnInit, loadTheses, etc.)
-  
-    /**
-     * Elimina una tesis por su ID después de una confirmación.
-     */
-    deleteThesis(id: string): void {
-      // Preguntar al usuario para confirmar la acción
-      if (confirm('¿Estás seguro de que quieres eliminar esta tesis? Esta acción no se puede deshacer.')) {
-        this.thesisService.deleteThesis(id).subscribe({
-          next: () => {
-            this.toastService.show('Tesis eliminada exitosamente', 'success');
-            // Volver a cargar la lista de tesis para reflejar el cambio
-            this.loadTheses(); 
-          },
-          error: (err) => {
-            console.error('Error al eliminar la tesis:', err);
-            this.toastService.show('No se pudo eliminar la tesis. Por favor, inténtalo de nuevo.', 'error');
-          }
-        });
-      }
-    }
-  
-    // ... (el resto de tu componente)
-  
+  logout(): void {
+    this.authService.logout();
+    this.router.navigate(['/login']);
+  }
 }

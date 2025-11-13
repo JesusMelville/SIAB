@@ -1,257 +1,505 @@
-const Thesis = require('../models/Thesis');
-const Metrics = require('../models/Metrics');
-const { getPrediction } = require('../services/mlService');
+// controllers/thesisController.js
+const path = require('path');
 const pdf = require('pdf-parse');
 const mongoose = require('mongoose');
-const modelColumns = require('../services/modelColumns'); // columnas para ML
+
+const Thesis = require('../models/Thesis');
+const Metrics = require('../models/Metrics');
+const { getPrediction, MODEL_COLUMNS } = require('../services/mlService');
 
 /**
- * Analiza una tesis: extrae metadatos, genera indicadores y llama a ML.
+ * Trata de sacar título, autor y año del PDF cuando no vienen en el body
+ */
+function fallbackFromPdf(text = '') {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+  const guessTitle = lines[0] || 'Título no identificado';
+
+  const guessAuthorLine = lines.find(l => /autor|autora|autor(es)/i.test(l));
+  const guessAuthor = guessAuthorLine
+    ? guessAuthorLine.replace(/autor(es)?:?/i, '').trim()
+    : 'Autor no identificado';
+
+  const yearMatch = text.match(/(20\d{2}|19\d{2})/);
+  const guessYear = yearMatch ? Number(yearMatch[1]) : new Date().getFullYear();
+
+  return {
+    titulo: guessTitle,
+    autor: guessAuthor || 'Autor no identificado',
+    anio: guessYear,
+  };
+}
+
+/**
+ * POST /api/tesis/analyze
  */
 const analyzeThesis = async (req, res) => {
   try {
-    if (!req.file)
-      return res.status(400).json({ success: false, message: 'No se ha subido ningún PDF.' });
+    // 1. validar que llegó archivo
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'No se ha subido ningún PDF.' });
+    }
 
-    // Extraer texto y metadatos del PDF desde el archivo guardado
+    // 2. leer PDF
     const data = await pdf(req.file.path).catch(err => {
-      console.warn('⚠ Advertencia al parsear PDF:', err.message);
+      console.warn('⚠ PDF parse error:', err.message);
       return { text: '', info: {} };
     });
 
     const texto = data.text?.trim() || '';
-    if (texto.length < 10)
-      return res.status(400).json({ success: false, message: 'PDF vacío o ilegible.' });
+    if (texto.length < 10) {
+      return res
+        .status(400)
+        .json({ success: false, message: 'PDF vacío o ilegible.' });
+    }
 
-    // 1. Usar los datos del formulario como fuente principal de verdad.
-    // El usuario ya los ha verificado en el frontend.
-    const { titulo, autor, anio: anioStr } = req.body;
+    // 👀 LOGS ÚTILES
+    console.log('👉 BODY recibido:', req.body);
+    console.log('👉 FILE recibido:', req.file?.originalname);
+    console.log('👉 PDF info:', data.info);
+
+    // 3. datos que pudo mandar el frontend
+    let { titulo, autor, anio: anioStr } = req.body;
+
+    // 3.1 intentar con metadatos del PDF si el body viene vacío
+    if (!titulo) {
+      titulo =
+        data.info?.Title ||
+        (req.file?.originalname
+          ? req.file.originalname.replace(/\.[^.]+$/, '')
+          : '');
+    }
+    if (!autor) {
+      autor = data.info?.Author || '';
+    }
+    if (!anioStr) {
+      // intenta buscar año en el texto
+      const yearMatch = texto.match(/(20\d{2}|19\d{2})/);
+      anioStr = yearMatch ? yearMatch[1] : '';
+    }
+
+    // 4. si todavía falta algo, uso fallback por líneas
+    if (!titulo || !autor || !anioStr) {
+      const fb = fallbackFromPdf(texto);
+      titulo = titulo || fb.titulo;
+      autor = autor || fb.autor;
+      anioStr = anioStr || fb.anio;
+    }
+
     const anio = Number(anioStr);
     if (!titulo || !autor || !anio || isNaN(anio)) {
       return res.status(400).json({
         success: false,
-        message: 'Faltan datos esenciales (título, autor o año) en la petición.'
+        message:
+          'Faltan datos esenciales (título, autor o año) y no se pudieron inferir del PDF.',
       });
     }
 
-    // 2. Generar indicadores para ML (lógica mejorada)
-    const indicadores = {};
     const textoMinusculas = texto.toLowerCase();
-    modelColumns.forEach(col => {
+    const indicadores = {};
+
+    // 5. construir indicadores
+    MODEL_COLUMNS.forEach(col => {
       const lc = col.toLowerCase();
-      let valor = 0; // Valor por defecto
+      let valor = 0;
 
-      // --- Lógica de cálculo basada en tu rúbrica ---
-
-      // Indicadores de Citación
+      // ========== CITACIÓN ==========
       if (lc.includes('antigüedad')) {
         const anioActual = new Date().getFullYear();
-        valor = anioActual > 0 ? (anioActual - anio) / anioActual : 0;
+        const edad = anioActual - anio;
+        const maxEdad = 10;
+        const score = Math.max(0, 1 - Math.min(edad, maxEdad) / maxEdad);
+        valor = score * 5;
       } else if (lc.includes('impacto de revistas')) {
-        // Imposible de calcular sin una API externa. Usamos un placeholder.
-        valor = 3.0; // Valor promedio/neutro (equivalente a Q3/Q4)
+        valor = 3.0;
       } else if (lc.includes('citas textuales')) {
-        const citasTextuales = (texto.match(/"[^"]{20,}"/g) || []).length; // Citas entre comillas
-        const totalCitas = (texto.match(/\([\w\s.,&]+\d{4}\)|\[\d+\]/g) || []).length + citasTextuales;
-        valor = totalCitas > 0 ? (citasTextuales / totalCitas) : 0; // PCT = (n° citas textuales) / (n° total de citas)
+        const citasTextuales = (texto.match(/"[^"]{20,}"/g) || []).length;
+        const totalCitas =
+          (texto.match(/\([\w\s.,&]+\d{4}\)|\[\d+\]/g) || []).length +
+          citasTextuales;
+        const pct = totalCitas > 0 ? citasTextuales / totalCitas : 0;
+        valor = pct > 0.1 ? 2 : Math.round(pct * 10) / 2;
       } else if (lc.includes('conectores')) {
-        const conectores = ['además','por lo tanto','sin embargo','por consiguiente','en conclusión'];
+        const conectores = [
+          'además',
+          'por lo tanto',
+          'sin embargo',
+          'por consiguiente',
+          'en conclusión',
+        ];
         const totalPalabras = texto.split(/\s+/).length;
-        const numConectores = conectores.reduce((acc, c) => acc + (textoMinusculas.split(c).length - 1), 0);
-        valor = totalPalabras > 0 ? (numConectores / totalPalabras) : 0; // PCL = (n° conectores) / (n° palabras)
+        const numConectores = conectores.reduce(
+          (acc, c) => acc + (textoMinusculas.split(c).length - 1),
+          0,
+        );
+        const ratio = totalPalabras > 0 ? numConectores / totalPalabras : 0;
+        valor = Math.min(5, ratio * 500);
       } else if (lc.includes('parafraseo')) {
         const citasTextuales = (texto.match(/"[^"]{20,}"/g) || []).length;
-        const totalCitas = (texto.match(/\([\w\s.,&]+\d{4}\)|\[\d+\]/g) || []).length + citasTextuales;
-        const pct = totalCitas > 0 ? (citasTextuales / totalCitas) : 0;
-        valor = 1 - pct; // Heurística: % Parafraseo = 1 - % Citas Textuales
-      } else if (lc.includes('fuentes')) {
-        const seccionReferencias = textoMinusculas.split(/referencias|bibliograf.a|fuentes consultadas|references/)[1];
-        const numFuentes = (seccionReferencias?.match(/\[\d+\]|\d+\./g) || []).length;
-        // Normalizamos el conteo a un valor entre 0 y 1. Asumimos 100 fuentes como un máximo razonable.
-        valor = Math.min(1, numFuentes / 100);
+        const totalCitas =
+          (texto.match(/\([\w\s.,&]+\d{4}\)|\[\d+\]/g) || []).length +
+          citasTextuales;
+        const pct = totalCitas > 0 ? citasTextuales / totalCitas : 0;
+        valor = (1 - pct) * 5;
+      } else if (lc.includes('fuentes utilizadas')) {
+        const seccionReferencias = textoMinusculas.split(
+          /referencias|bibliograf.a|fuentes consultadas|references/,
+        )[1];
+        const numFuentes =
+          (seccionReferencias?.match(/\[\d+\]|\d+\./g) || []).length;
+        valor = Math.min(5, (numFuentes / 100) * 5);
+      }
 
-      // Indicadores Metodológicos (búsqueda de palabras clave)
-      } else if (lc.includes('tipo de investigación')) {
-        if (textoMinusculas.includes('aplicada') || textoMinusculas.includes('tecnológica')) valor = 2; else valor = 1;
+      // ========== METODOLÓGICOS ==========
+      else if (lc.includes('tipo de investigación')) {
+        if (
+          textoMinusculas.includes('aplicada') ||
+          textoMinusculas.includes('tecnológica')
+        )
+          valor = 5;
+        else valor = 3;
       } else if (lc.includes('enfoque')) {
-        if (textoMinusculas.includes('mixto')) valor = 3; else if (textoMinusculas.includes('cualitativo')) valor = 2; else valor = 1;
+        if (textoMinusculas.includes('mixto')) valor = 5;
+        else if (textoMinusculas.includes('cualitativo')) valor = 4;
+        else valor = 3;
       } else if (lc.includes('nivel (alcance)')) {
-        if (textoMinusculas.includes('aplicativo')) valor = 6; else if (textoMinusculas.includes('predictivo')) valor = 5; else if (textoMinusculas.includes('explicativo')) valor = 4; else if (textoMinusculas.includes('correlacional')) valor = 3; else if (textoMinusculas.includes('descriptivo')) valor = 2; else valor = 1;
+        if (textoMinusculas.includes('aplicativo')) valor = 5;
+        else if (textoMinusculas.includes('explicativo')) valor = 4;
+        else if (textoMinusculas.includes('correlacional')) valor = 3;
+        else if (textoMinusculas.includes('descriptivo')) valor = 2;
+        else valor = 1;
       } else if (lc.includes('diseño de investigación')) {
-        if (textoMinusculas.includes('experimental')) valor = 2; else valor = 1;
+        if (textoMinusculas.includes('experimental')) valor = 5;
+        else if (textoMinusculas.includes('cuasi experimental')) valor = 4;
+        else valor = 3;
+      }
 
-      // Otros Indicadores (presencia/ausencia de palabras clave)
+      // ========== INNOVACIÓN / DESARROLLO ==========
+      else if (lc.includes('desarrollo de software')) {
+        valor = textoMinusculas.includes('software') ? 5 : 0;
+      } else if (lc.includes('tecnologías emergentes')) {
+        valor =
+          textoMinusculas.includes('iot') ||
+          textoMinusculas.includes('blockchain') ||
+          textoMinusculas.includes('inteligencia artificial')
+            ? 5
+            : 0;
+      } else if (lc.includes('validación de modelos')) {
+        valor = textoMinusculas.includes('validación') ? 5 : 0;
+      } else if (lc.includes('marcos de referencias')) {
+        valor = textoMinusculas.includes('marco teórico') ? 4 : 2;
+      } else if (lc.includes('validación del producto')) {
+        valor = textoMinusculas.includes('prueba piloto') ? 5 : 2;
+      }
+
+      // ========== TÉCNICAS / INSTRUMENTOS ==========
+      else if (lc.includes('encuestas')) {
+        valor = textoMinusculas.includes('encuesta') ? 5 : 0;
+      } else if (lc.includes('observación / registro de datos')) {
+        valor =
+          textoMinusculas.includes('observación') ||
+          textoMinusculas.includes('registro de datos')
+            ? 5
+            : 0;
+      } else if (lc.includes('entrevistas')) {
+        valor = textoMinusculas.includes('entrevista') ? 5 : 0;
+      }
+
+      // ========== RESULTADOS / DISCUSIÓN ==========
+      else if (lc.includes('aplicación de pruebas estadísticas')) {
+        valor =
+          (textoMinusculas.match(
+            /t-student|chi-cuadrado|anova|regresión lineal|prueba estadística/g,
+          ) || []).length > 0
+            ? 5
+            : 0;
       } else if (lc.includes('métricas de rendimiento')) {
-        valor = (textoMinusculas.match(/performance|rendimiento|eficiencia/g) || []).length > 0 ? 1 : 0;
-      } else if (lc.includes('pruebas estadísticas')) {
-        // Busca palabras clave relacionadas con pruebas estadísticas
-        valor = (textoMinusculas.match(/t-student|chi-cuadrado|anova|regresión lineal|prueba estadística/g) || []).length > 0 ? 1 : 0;
+        valor =
+          (textoMinusculas.match(/performance|rendimiento|eficiencia/g) || [])
+            .length > 0
+            ? 5
+            : 0;
       } else if (lc.includes('relevantes y aportan')) {
-        valor = textoMinusculas.includes('conclusiones') && textoMinusculas.includes('discusión') ? 8 : 4;
-      } else if (lc.includes('desarrollo de software') || lc.includes('tecnologías emergentes') || lc.includes('validación de modelos') || lc.includes('marcos de referencias') || lc.includes('validación del producto') || lc.includes('encuestas') || lc.includes('observación') || lc.includes('entrevistas')) {
-        const keywords = lc.split(' ')[0].replace(/%/g, '');
-        valor = textoMinusculas.includes(keywords) ? 1 : 0;
+        valor =
+          textoMinusculas.includes('conclusiones') &&
+          textoMinusculas.includes('discusión')
+            ? 5
+            : 3;
       }
 
       indicadores[col] = valor;
     });
 
-    // Predicción ML
-    const prediccion = await getPrediction(indicadores);
-    if (prediccion === undefined || prediccion === null || isNaN(prediccion))
-      throw new Error('Predicción del ML inválida o no recibida.');
-
-    // 3. Agrupar y calcular puntajes por categoría para el desglose
-    // Esta función AHORA normaliza los indicadores de entrada (features) a una escala 0-100 para VISUALIZACIÓN.
-    // No calcula la nota, solo representa los datos que el modelo usó.
-    const calcularPuntajeCategoria = (indicadores, claves) => {
-      const puntajesNormalizados = claves.map(clave => {
-        const valor = indicadores[clave] || 0;
-        // Si el valor es un porcentaje (0-1), lo escala a 0-100.
-        if (valor >= 0 && valor <= 1 && clave.includes('%')) {
-          return valor * 100;
-        }
-        // Para otros valores (ej. Nivel 1-8), los escala a un rango de 0-100.
-        // Esto es solo para visualización, no afecta la predicción.
-        // Usamos 8 como un máximo común para valores no porcentuales de tu rúbrica.
-        const maxValorPosible = 8;
-        return Math.min(100, (valor / maxValorPosible) * 100);
-      });
-      // Devuelve el promedio de los indicadores normalizados para esa categoría.
-      const puntajesValidos = puntajesNormalizados.filter(isFinite);
-      if (puntajesValidos.length === 0) {
-        return 0; // Si no hay indicadores válidos, el puntaje es 0.
-      }
-      const suma = puntajesValidos.reduce((acc, val) => acc + val, 0);
-      return suma / puntajesValidos.length;
+    // 6. helpers 0..5 → 0..20
+    const to20 = v => Math.max(0, Math.min(20, (v / 5) * 20));
+    const calcBloque = (indicadores, keys) => {
+      const vals = keys
+        .map(k => (indicadores[k] !== undefined ? to20(indicadores[k]) : 0))
+        .filter(n => !Number.isNaN(n));
+      if (!vals.length) return 0;
+      const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+      return Math.min(20, avg);
     };
 
+    // 7. 5 BLOQUES
     const puntajesDesglose = {
-      citacion: calcularPuntajeCategoria(indicadores, ['Índice de antigüedad', 'Índice de impacto de revistas', '% de citas textuales', '% de conectores lógicos', '% de parafraseo', '% de fuentes utilizadas']),
-      metodologia: calcularPuntajeCategoria(indicadores, ['Tipo de investigación', 'Enfoque', 'Nivel (alcance)', 'Diseño de investigación']),
-      innovacion: calcularPuntajeCategoria(indicadores, ['Desarrollo de software', 'Tecnologías emergentes', 'Validación de modelos', 'Marcos de referencias', 'Validación del producto']),
-      tecnicas: calcularPuntajeCategoria(indicadores, ['Encuestas', 'Observación / Registro de datos', 'Entrevistas']),
-      resultados: calcularPuntajeCategoria(indicadores, ['Aplicación de pruebas estadísticas', 'Métricas de rendimiento', 'Relevantes y aportan a la ciencia y tecnología'])
+      citacion: calcBloque(indicadores, [
+        'Índice de antigüedad',
+        'Índice de impacto de revistas',
+        '% de citas textuales',
+        '% de conectores lógicos',
+        '% de parafraseo',
+        '% de fuentes utilizadas',
+      ]),
+      metodologia: calcBloque(indicadores, [
+        'Tipo de investigación',
+        'Enfoque',
+        'Nivel (alcance)',
+        'Diseño de investigación',
+      ]),
+      innovacion: calcBloque(indicadores, [
+        'Desarrollo de software',
+        'Tecnologías emergentes',
+        'Validación de modelos',
+        'Marcos de referencias',
+        'Validación del producto',
+      ]),
+      tecnicas: calcBloque(indicadores, [
+        'Encuestas',
+        'Observación / Registro de datos',
+        'Entrevistas',
+      ]),
+      resultados: calcBloque(indicadores, [
+        'Aplicación de pruebas estadísticas',
+        'Métricas de rendimiento',
+        'Relevantes y aportan a la ciencia y tecnología',
+      ]),
     };
 
-    // Categoría
-    const puntajeTotal = prediccion; // La predicción del modelo YA está en la escala correcta (0-100)
-    const categoria = puntajeTotal >= 75 ? 'Excelente'
-                     : puntajeTotal >= 50 ? 'Buena'
-                     : puntajeTotal >= 25 ? 'Regular'
-                     : 'Deficiente';
+    // 8. TOTAL = suma 5 bloques → 0..100
+    const puntajeTotal =
+      Math.round(
+        puntajesDesglose.citacion +
+          puntajesDesglose.metodologia +
+          puntajesDesglose.innovacion +
+          puntajesDesglose.tecnicas +
+          puntajesDesglose.resultados,
+      );
 
-    // Guardar tesis
-    const newThesis = new Thesis({
-      titulo, autor, anio,
-      user: req.user.id,
-      calificacionPredicha: puntajeTotal,
-      categoria, indicadores,
-      filePath: req.file.path,
-      fileName: req.file.filename
-    });
+    // 9. puntaje modelo puro (opcional)
+    let puntajeModelo = 0;
+    try {
+      const pred = await getPrediction(indicadores);
+      if (Number.isFinite(pred)) {
+        puntajeModelo = pred;
+      }
+    } catch (_) {
+      // no romper
+    }
 
-    // 4. Generar recomendaciones específicas basadas en el desglose de puntajes
+    // 10. categoría
+    const categoria =
+      puntajeTotal >= 75
+        ? 'Excelente'
+        : puntajeTotal >= 50
+          ? 'Buena'
+          : puntajeTotal >= 25
+            ? 'Regular'
+            : 'Deficiente';
+
+    // 11. recomendaciones
     const generarRecomendaciones = (puntajes, categoriaGeneral) => {
-      const recomendaciones = [];
-      const umbralMejora = 60; // Puntajes por debajo de esto generan una recomendación
+      const recs = [];
+      const umbral = 12; // 12/20 ≈ 60%
 
       if (categoriaGeneral === 'Excelente') {
-        recomendaciones.push({ texto: 'El trabajo demuestra una calidad excepcional en todas las áreas. Mantener el rigor y la claridad en futuras investigaciones.', categoria: 'General', prioridad: 'Baja' });
-        return recomendaciones;
+        recs.push({
+          texto: 'Mantener estructura, fuentes y metodología. Trabajo sólido.',
+          categoria: 'General',
+          prioridad: 'Baja',
+        });
+        return recs;
       }
 
-      if (puntajes.citacion < umbralMejora) {
-        recomendaciones.push({ texto: 'Revisar y diversificar las fuentes citadas. Asegurar que el índice de antigüedad y el impacto de las revistas sean óptimos.', categoria: 'Citación', prioridad: 'Alta' });
+      if (puntajes.citacion < umbral) {
+        recs.push({
+          texto:
+            'Mejorar calidad y actualidad de las fuentes; reducir citas textuales >10%.',
+          categoria: 'Citación',
+          prioridad: 'Alta',
+        });
       }
-      if (puntajes.metodologia < umbralMejora) {
-        recomendaciones.push({ texto: 'Reforzar la sección de metodología. Detallar con mayor claridad el tipo de investigación, el diseño y el alcance del estudio.', categoria: 'Metodología', prioridad: 'Alta' });
+      if (puntajes.metodologia < umbral) {
+        recs.push({
+          texto: 'Detallar mejor tipo, enfoque y diseño de la investigación.',
+          categoria: 'Metodología',
+          prioridad: 'Alta',
+        });
       }
-      if (puntajes.innovacion < umbralMejora) {
-        recomendaciones.push({ texto: 'Explorar la inclusión de tecnologías más emergentes o marcos de referencia actualizados para aumentar el componente innovador.', categoria: 'Innovación', prioridad: 'Media' });
+      if (puntajes.innovacion < umbral) {
+        recs.push({
+          texto: 'Agregar tecnologías emergentes o marcos reconocidos.',
+          categoria: 'Innovación',
+          prioridad: 'Media',
+        });
       }
-      if (puntajes.resultados < umbralMejora) {
-        recomendaciones.push({ texto: 'Fortalecer la sección de resultados y discusión. Asegurar que las conclusiones sean relevantes y aporten valor a la ciencia y tecnología.', categoria: 'Resultados', prioridad: 'Alta' });
+      if (puntajes.tecnicas < umbral) {
+        recs.push({
+          texto:
+            'Documentar mejor los instrumentos aplicados (encuesta, entrevista, observación).',
+          categoria: 'Técnicas',
+          prioridad: 'Media',
+        });
+      }
+      if (puntajes.resultados < umbral) {
+        recs.push({
+          texto:
+            'Fortalecer análisis estadístico, discusión y conclusiones finales.',
+          categoria: 'Resultados',
+          prioridad: 'Alta',
+        });
       }
 
-      return recomendaciones.length > 0 ? recomendaciones : [{ texto: 'Buen trabajo general. Considerar pulir los aspectos con menor puntaje para alcanzar la excelencia.', categoria: 'General', prioridad: 'Media' }];
+      return recs.length
+        ? recs
+        : [
+            {
+              texto: 'Buen trabajo general. Pulir los indicadores más bajos.',
+              categoria: 'General',
+              prioridad: 'Media',
+            },
+          ];
     };
 
-    // Guardar métricas
+    // 12. guardar tesis
+    const newThesis = new Thesis({
+      titulo,
+      autor,
+      anio,
+      user: req.user.id,
+      calificacionPredicha: puntajeTotal,
+      categoria,
+      indicadores,
+      filePath: req.file.path,
+      fileName: path.basename(req.file.path),
+      mlScore: puntajeModelo,
+    });
+
+    // 13. guardar métricas
     const newMetrics = await Metrics.create({
       tesisId: newThesis._id,
-      puntajes: { 
+      puntajes: {
         total: puntajeTotal,
-        ...puntajesDesglose
+        ...puntajesDesglose,
       },
-      prediccionIA: { categoria, confianza: 0.9, modeloVersion: '1.1' },
+      prediccionIA: {
+        categoria,
+        confianza: 0.9,
+        modeloVersion: '1.2',
+        mlScore: puntajeModelo,
+      },
       comparativa: {},
-      recomendaciones: generarRecomendaciones(puntajesDesglose, categoria)
+      recomendaciones: generarRecomendaciones(puntajesDesglose, categoria),
     });
 
     await newThesis.save();
-    res.status(201).json({
+
+    // 14. responder con el ID para que el frontend pueda redirigir
+    return res.status(201).json({
       success: true,
       message: 'Tesis analizada exitosamente.',
-      data: { ...newThesis.toObject(), metrics: newMetrics }
+      data: {
+        ...newThesis.toObject(),
+        metrics: newMetrics,
+      },
     });
-
   } catch (error) {
     console.error('❌ Error al analizar la tesis:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Error al analizar la tesis.',
-      error: error.message
+      error: error.message,
     });
   }
 };
 
 /**
- * Obtener todas las tesis del usuario
+ * GET /api/tesis
  */
 const getAllUserTheses = async (req, res) => {
   try {
-    const theses = await Thesis.find({ user: req.user.id }).sort({ createdAt: -1 });
-    res.status(200).json({ success: true, data: theses });
+    const theses = await Thesis.find({ user: req.user.id }).sort({
+      createdAt: -1,
+    });
+    return res.status(200).json({ success: true, data: theses });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error al obtener las tesis.', error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener las tesis.',
+      error: error.message,
+    });
   }
 };
 
 /**
- * Obtener una tesis por ID
+ * GET /api/tesis/:id
  */
 const getThesisById = async (req, res) => {
   try {
     const thesis = await Thesis.findById(req.params.id).lean();
-    if (!thesis) return res.status(404).json({ success: false, message: 'Tesis no encontrada' });
+    if (!thesis) {
+      return res
+        .status(404)
+        .json({ success: false, message: 'Tesis no encontrada' });
+    }
+
+    if (thesis.user.toString() !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Sin permiso.' });
+    }
 
     const metrics = await Metrics.findOne({ tesisId: thesis._id }).lean();
-    res.status(200).json({ success: true, data: { ...thesis, metrics: metrics || null } });
+    return res.status(200).json({
+      success: true,
+      data: { ...thesis, metrics: metrics || null },
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error al obtener la tesis', error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener la tesis',
+      error: error.message,
+    });
   }
 };
 
 /**
- * Estadísticas del usuario
+ * GET /api/tesis/stats
  */
 const getStatistics = async (req, res) => {
   try {
     const userId = req.user.id;
+
     const total = await Thesis.countDocuments({ user: userId });
 
-    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const thisMonth = await Thesis.countDocuments({ user: userId, createdAt: { $gte: startOfMonth } });
+    const startOfMonth = new Date(
+      new Date().getFullYear(),
+      new Date().getMonth(),
+      1,
+    );
+    const thisMonth = await Thesis.countDocuments({
+      user: userId,
+      createdAt: { $gte: startOfMonth },
+    });
 
     const avgResult = await Thesis.aggregate([
       { $match: { user: new mongoose.Types.ObjectId(userId) } },
-      { $group: { _id: null, promedio: { $avg: '$calificacionPredicha' } } }
+      { $group: { _id: null, promedio: { $avg: '$calificacionPredicha' } } },
     ]);
 
     const stats = await Thesis.aggregate([
       { $match: { user: new mongoose.Types.ObjectId(userId) } },
-      { $group: { _id: '$categoria', count: { $sum: 1 } } }
+      { $group: { _id: '$categoria', count: { $sum: 1 } } },
     ]);
 
     const categoriasContadas = stats.reduce((acc, curr) => {
@@ -266,74 +514,87 @@ const getStatistics = async (req, res) => {
         Excelente: categoriasContadas['Excelente'] || 0,
         Buena: categoriasContadas['Buena'] || 0,
         Regular: categoriasContadas['Regular'] || 0,
-        Deficiente: categoriasContadas['Deficiente'] || 0
+        Deficiente: categoriasContadas['Deficiente'] || 0,
       },
-      thisMonth
+      thisMonth,
     };
 
-    res.status(200).json({ success: true, data: statisticsData });
+    return res.status(200).json({ success: true, data: statisticsData });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Error al obtener estadísticas.', error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: 'Error al obtener estadísticas.',
+      error: error.message,
+    });
   }
 };
 
 /**
- * Elimina una tesis y sus métricas asociadas.
+ * DELETE /api/tesis/:id
  */
 const deleteThesis = async (req, res) => {
   try {
     const thesisId = req.params.id;
     const userId = req.user.id;
 
-    // 1. Buscar la tesis para asegurarse de que pertenece al usuario.
     const thesis = await Thesis.findOne({ _id: thesisId, user: userId });
-
     if (!thesis) {
-      return res.status(404).json({ success: false, message: 'Tesis no encontrada o no tienes permiso para eliminarla.' });
+      return res.status(404).json({
+        success: false,
+        message: 'Tesis no encontrada o sin permiso.',
+      });
     }
 
-    // 2. Eliminar la tesis y las métricas asociadas en paralelo para mayor eficiencia.
     await Promise.all([
       Thesis.findByIdAndDelete(thesisId),
-      Metrics.findOneAndDelete({ tesisId: thesisId })
+      Metrics.findOneAndDelete({ tesisId: thesisId }),
     ]);
 
-    res.status(200).json({ success: true, message: 'Tesis eliminada correctamente.' });
-
+    return res
+      .status(200)
+      .json({ success: true, message: 'Tesis eliminada correctamente.' });
   } catch (error) {
     console.error('❌ Error al eliminar la tesis:', error);
-    res.status(500).json({ success: false, message: 'Error interno al eliminar la tesis.', error: error.message });
+    return res.status(500).json({
+      success: false,
+      message: 'Error interno al eliminar la tesis.',
+      error: error.message,
+    });
   }
 };
 
 /**
- * Descarga el archivo PDF de una tesis.
+ * GET /api/tesis/:id/download
  */
 const downloadThesisFile = async (req, res) => {
   try {
     const thesis = await Thesis.findById(req.params.id);
     if (!thesis || !thesis.filePath) {
-      return res.status(404).json({ success: false, message: 'Archivo de tesis no encontrado.' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'Archivo no encontrado.' });
     }
 
-    // Seguridad: Asegurarse de que el usuario que descarga es el dueño de la tesis
     if (thesis.user.toString() !== req.user.id) {
-      return res.status(403).json({ success: false, message: 'No tienes permiso para descargar este archivo.' });
+      return res.status(403).json({ success: false, message: 'Sin permiso.' });
     }
 
-    res.download(thesis.filePath, thesis.fileName); // Envía el archivo para su descarga
+    return res.download(thesis.filePath, thesis.fileName);
   } catch (error) {
     console.error('❌ Error al descargar el archivo de la tesis:', error);
-    res.status(500).json({ success: false, message: 'Error interno al descargar el archivo.' });
+    return res.status(500).json({
+      success: false,
+      message: 'Error interno al descargar el archivo.',
+      error: error.message,
+    });
   }
 };
 
-// Exportar
 module.exports = {
   analyzeThesis,
   getAllUserTheses,
   getThesisById,
   getStatistics,
   deleteThesis,
-  downloadThesisFile
+  downloadThesisFile,
 };

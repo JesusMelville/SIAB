@@ -1,33 +1,39 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { environment } from '../../../environments/environment';
+import { Metrics } from '../models/metrics.model';
 
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class AnalysisService {
-  private apiUrl = `${environment.apiUrl}/analysis`;
-
-  constructor(private http: HttpClient) {}
-
-  // Calcular métricas bibliométricas
-  calculateMetrics(thesisData: any): Observable<any> {
-    return this.http.post(`${this.apiUrl}/calculate-metrics`, thesisData);
+  toRadar(metrics: Metrics | null) {
+    if (!metrics) {
+      return {
+        labels: [],
+        datasets: [],
+      };
+    }
+    return {
+      labels: ['Citación', 'Metodología', 'Innovación', 'Técnicas', 'Resultados'],
+      datasets: [
+        {
+          label: 'Puntajes',
+          data: [
+            metrics.puntajes.citacion,
+            metrics.puntajes.metodologia,
+            metrics.puntajes.innovacion,
+            metrics.puntajes.tecnicas,
+            metrics.puntajes.resultados,
+          ],
+        },
+      ],
+    };
   }
 
-  // Obtener predicción IA
-  getIAPrediction(thesisId: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/ia-prediction/${thesisId}`);
+  getRecommendations(metrics: Metrics | null) {
+    if (!metrics) return [];
+    return metrics.recomendaciones ?? [];
   }
 
-  // Generar recomendaciones
-  getRecommendations(thesisId: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/recommendations/${thesisId}`);
-  }
-
-  // Comparar con universidad
-  compareWithUniversity(thesisId: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/compare-university/${thesisId}`);
+  getTotal(metrics: Metrics | null) {
+    if (!metrics) return 0;
+    return metrics.puntajes.total ?? 0;
   }
 }

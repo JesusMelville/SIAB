@@ -1,7 +1,7 @@
 import {
   _typeof
 } from "./chunk-WUUVWCMF.js";
-import "./chunk-PC6IZSQ2.js";
+import "./chunk-TXDUYLVM.js";
 
 // node_modules/fflate/esm/browser.js
 var ch2 = {};
@@ -14863,7 +14863,7 @@ function(t2) {
     });
   }
   function r() {
-    return (i.DOMPurify ? Promise.resolve(i.DOMPurify) : import("./purify.es-36LZOXJC.js")).catch(function(t2) {
+    return (i.DOMPurify ? Promise.resolve(i.DOMPurify) : import("./purify.es-R7C2DGOH.js")).catch(function(t2) {
       return Promise.reject(new Error("Could not load dompurify: " + t2));
     }).then(function(t2) {
       return t2.default ? t2.default : t2;
@@ -16037,7 +16037,7 @@ function(t2) {
     ignoreAnimation: true,
     ignoreDimensions: true
   }, d2 = this;
-  return (i.canvg ? Promise.resolve(i.canvg) : import("./index.es-CXMJZUXN.js")).catch(function(t3) {
+  return (i.canvg ? Promise.resolve(i.canvg) : import("./index.es-OSGVZQBI.js")).catch(function(t3) {
     return Promise.reject(new Error("Could not load canvg: " + t3));
   }).then(function(t3) {
     return t3.default ? t3.default : t3;

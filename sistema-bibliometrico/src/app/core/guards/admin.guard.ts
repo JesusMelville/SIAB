@@ -4,21 +4,12 @@ import { AuthService } from '../services/auth.service';
 
 @Injectable({ providedIn: 'root' })
 export class AdminGuard implements CanActivate {
-    constructor(
-        private router: Router,
-        private authService: AuthService
-    ) {}
+  constructor(private router: Router, private authService: AuthService) {}
 
-    canActivate() {
-        const currentUser = this.authService.currentUserValue;
-
-        // Comprueba si hay un usuario logueado Y si su rol es 'admin'
-        if (currentUser && currentUser.role === 'admin') {
-            return true; // Permite el acceso
-        }
-
-        // Si no es admin, redirige al dashboard normal y bloquea el acceso
-        this.router.navigate(['/dashboard']);
-        return false;
-    }
+  canActivate(): boolean {
+    const currentUser = this.authService.currentUserValue;
+    if (currentUser && currentUser.role === 'admin') return true;
+    this.router.navigate(['/dashboard']);
+    return false;
+  }
 }

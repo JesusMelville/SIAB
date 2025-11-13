@@ -1,19 +1,18 @@
-// src/app/core/models/thesis.model.ts
-
 import { Metrics } from './metrics.model';
+import { User } from './user.model';
 
 export interface Thesis {
   _id?: string;
   titulo: string;
   autor: string;
   anio: number;
-  user: string;
+  user: string | User;
   calificacionPredicha: number;
   categoria: string;
   indicadores: { [key: string]: number };
   metrics?: Metrics;
-  filePath?: string; // <-- AÑADE ESTA LÍNEA
-  fileName?: string; // <-- AÑADE ESTA LÍNEA
+  filePath?: string;
+  fileName?: string;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -1,26 +1,49 @@
+// routes/thesisRoutes.js
 const express = require('express');
-const thesisController = require('../controllers/thesisController');
-const pdfController = require('../controllers/pdfController');
-const authMiddleware = require('../middleware/authMiddleware');
-
 const router = express.Router();
 
-// Proteger todas las rutas
-router.use(authMiddleware.protect);
+const {
+  analyzeThesis,
+  getAllUserTheses,
+  getThesisById,
+  getStatistics,
+  deleteThesis,
+  downloadThesisFile,
+} = require('../controllers/thesisController');
 
-// Rutas
-router.get('/', thesisController.getAllUserTheses);
-router.get('/stats', thesisController.getStatistics);
-router.get('/:id', thesisController.getThesisById);
-router.delete('/:id', thesisController.deleteThesis);
-router.get('/:id/download', thesisController.downloadThesisFile);
+const { protect } = require('../middleware/authMiddleware');
+const multer = require('multer');
+const path = require('path');
 
+// carpeta uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, '..', 'uploads'));
+  },
+  filename: function (req, file, cb) {
+    const ext = path.extname(file.originalname);
+    cb(null, Date.now() + ext);
+  },
+});
 
-// Subida y análisis
-router.post(
-  '/analyze',
-  pdfController.uploadThesisFile, // 1. Primero, se ejecuta tu middleware para procesar el archivo.
-  thesisController.analyzeThesis  // 2. Si el archivo es válido, se pasa a la lógica principal.
-);
+const upload = multer({ storage });
+
+// ANALIZAR (con PDF)  👉 el front envía `file`
+router.post('/analyze', protect, upload.single('file'), analyzeThesis);
+
+// LISTAR MIS TESIS
+router.get('/mine', protect, getAllUserTheses);
+
+// UNA TESIS
+router.get('/:id', protect, getThesisById);
+
+// ESTADÍSTICAS
+router.get('/me/stats', protect, getStatistics);
+
+// DESCARGAR PDF
+router.get('/:id/download', protect, downloadThesisFile);
+
+// ELIMINAR
+router.delete('/:id', protect, deleteThesis);
 
 module.exports = router;

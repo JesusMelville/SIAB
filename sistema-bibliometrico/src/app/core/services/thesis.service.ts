@@ -1,74 +1,41 @@
-// src/app/core/services/thesis.service.ts
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams, HttpEvent, HttpHeaders } from '@angular/common/http';
-import { Observable, throwError } from 'rxjs';
-import { catchError } from 'rxjs/operators';
-import { Thesis } from '../models/thesis.model';
-import { Statistics } from '../models/statistics.model';
-import { ApiResponse } from '../models/api-response.model';
-import { AuthService } from './auth.service';
+import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
+import { Observable } from 'rxjs';
+import { Thesis } from '../models/thesis.model';
+import { ApiResponse } from '../models/api-response.model';
 
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class ThesisService {
   private apiUrl = `${environment.apiUrl}/tesis`;
 
-  constructor(
-    private http: HttpClient,
-    private authService: AuthService
-  ) {}
-  
-  getAllTheses(
-    page: number = 1,
-    limit: number = 10,
-    filters?: { [key: string]: string | number }
-  ): Observable<ApiResponse<Thesis[]>> {
-    let params = new HttpParams()
-      .set('page', page.toString())
-      .set('limit', limit.toString());
+  constructor(private http: HttpClient) {}
 
-    if (filters) {
-      Object.keys(filters).forEach(key => {
-        if (filters[key] != null) {
-          params = params.set(key, filters[key].toString());
-        }
-      });
-    }
-
-    return this.http
-      .get<ApiResponse<Thesis[]>>(this.apiUrl, { params })
-      .pipe(catchError(err => throwError(() => err)));
+  uploadAndAnalyze(formData: FormData): Observable<ApiResponse<Thesis>> {
+    return this.http.post<ApiResponse<Thesis>>(`${this.apiUrl}/analyze`, formData);
   }
 
-  getStatistics(): Observable<ApiResponse<Statistics>> {
-    return this.http
-      .get<ApiResponse<Statistics>>(`${this.apiUrl}/stats`)
-      .pipe(catchError(err => throwError(() => err)));
+  getMyTheses(): Observable<ApiResponse<Thesis[]>> {
+    return this.http.get<ApiResponse<Thesis[]>>(`${this.apiUrl}/mine`);
   }
 
+  // nombre original
+  getById(id: string): Observable<ApiResponse<Thesis>> {
+    return this.http.get<ApiResponse<Thesis>>(`${this.apiUrl}/${id}`);
+  }
+
+  // ✅ alias para que el diagnostic no reviente
   getThesisById(id: string): Observable<ApiResponse<Thesis>> {
-    return this.http
-      .get<ApiResponse<Thesis>>(`${this.apiUrl}/${id}`)
-      .pipe(catchError(err => throwError(() => err)));
+    return this.getById(id);
   }
 
-  analyzeNewThesis(formData: FormData): Observable<HttpEvent<ApiResponse<Thesis>>> {
-    return this.http.post<ApiResponse<Thesis>>(`${this.apiUrl}/analyze`, formData, {
-      reportProgress: true,
-      observe: 'events'
-    }).pipe(catchError(err => throwError(() => err)));
+  delete(id: string): Observable<ApiResponse<any>> {
+    return this.http.delete<ApiResponse<any>>(`${this.apiUrl}/${id}`);
   }
 
-  deleteThesis(thesisId: string): Observable<ApiResponse<null>> {
-    return this.http
-      .delete<ApiResponse<null>>(`${this.apiUrl}/${thesisId}`)
-      .pipe(catchError(err => throwError(() => err)));
-  }
-
-  downloadThesisPDF(thesisId: string): Observable<Blob> {
-    // Pedimos la respuesta como un 'blob' que representa el archivo binario
-    return this.http.get(`${this.apiUrl}/${thesisId}/download`, { responseType: 'blob' });
+  download(id: string): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/${id}/download`, {
+      responseType: 'blob',
+    });
   }
 }
