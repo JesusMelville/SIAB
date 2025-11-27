@@ -1,0 +1,9 @@
+flask
+gunicorn
+flask-cors
+pandas
+numpy
+scikit-learn
+matplotlib
+joblib
+xgboost  # opcional: quitar si no lo usas

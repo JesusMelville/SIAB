@@ -1,0 +1,102 @@
+{
+  "stats": {
+    "min": 0.0,
+    "max": 86.0,
+    "mean": 65.40666666666667,
+    "std": 14.691501751476823,
+    "n_samples": 150
+  },
+  "top_features_by_corr": {
+    "Validación del producto": 0.7302044821857089,
+    "Métricas de rendimiento": 0.7073506069311651,
+    "Observación / Registro de datos": 0.6417751605356575,
+    "Desarrollo de software": 0.53833546376283,
+    "Marcos de referencias": 0.5183143155690348,
+    "Aplicación de pruebas estadísticas": 0.5062673479176324,
+    "Enfoque": 0.45654614183219094,
+    "Tipo de investigación": 0.4284174156265165,
+    "Tecnologías emergentes": 0.37028621038604836,
+    "Índice de antigüedad": 0.36314564414695244,
+    "Encuestas": 0.35347439869074637,
+    "Validación de modelos": 0.3504956269771521,
+    "Entrevistas": 0.3446021752502398,
+    "Diseño de investigación": 0.34373514493549817,
+    "Relevantes y aportan a la ciencia y tecnología": 0.3334146370003514,
+    "% de citas textuales": 0.23938825633758867,
+    "Nivel (alcance)": 0.22283987417018522,
+    "Índice de impacto de revistas": 0.2146243779286491,
+    "% de parafraseo": 0.18887514773571795,
+    "% de fuentes utilizadas": 0.15877111587530252
+  },
+  "suspicious_features": [],
+  "models_summary": [
+    {
+      "model": "Ridge",
+      "mse_train": 0.025955701135312505,
+      "mse_test": 0.04045534649588753,
+      "rmse_train": 0.16110773145728452,
+      "rmse_test": 0.2011351448551136,
+      "r2_train": 0.9998844494573247,
+      "r2_test": 0.9997668264808209
+    },
+    {
+      "model": "GradientBoosting",
+      "mse_train": 0.2445975564324371,
+      "mse_test": 3.6208542832028177,
+      "rmse_train": 0.49456805035549667,
+      "rmse_test": 1.9028542464421225,
+      "r2_train": 0.9989110916235517,
+      "r2_test": 0.9791303892123386
+    },
+    {
+      "model": "ExtraTrees",
+      "mse_train": 0.0010479166666666807,
+      "mse_test": 5.9459110416666645,
+      "rmse_train": 0.032371540999258604,
+      "rmse_test": 2.438423884739211,
+      "r2_train": 0.9999953348461333,
+      "r2_test": 0.9657293998840851
+    },
+    {
+      "model": "RandomForest",
+      "mse_train": 1.6078370833333337,
+      "mse_test": 6.158168333333336,
+      "rmse_train": 1.2680051590326176,
+      "rmse_test": 2.4815657019981026,
+      "r2_train": 0.992842171877995,
+      "r2_test": 0.9645060070829784
+    }
+  ],
+  "plots_by_score": [
+    "diagnostics/puntaje_71.0.png",
+    "diagnostics/puntaje_70.0.png",
+    "diagnostics/puntaje_68.0.png",
+    "diagnostics/puntaje_72.0.png",
+    "diagnostics/puntaje_73.0.png",
+    "diagnostics/puntaje_66.0.png",
+    "diagnostics/puntaje_58.0.png",
+    "diagnostics/puntaje_76.0.png",
+    "diagnostics/puntaje_49.0.png",
+    "diagnostics/puntaje_79.0.png",
+    "diagnostics/puntaje_64.0.png",
+    "diagnostics/puntaje_63.0.png",
+    "diagnostics/puntaje_75.0.png",
+    "diagnostics/puntaje_61.0.png",
+    "diagnostics/puntaje_81.0.png",
+    "diagnostics/puntaje_77.0.png",
+    "diagnostics/puntaje_74.0.png",
+    "diagnostics/puntaje_78.0.png",
+    "diagnostics/puntaje_80.0.png",
+    "diagnostics/puntaje_60.0.png",
+    "diagnostics/puntaje_55.0.png",
+    "diagnostics/puntaje_67.0.png",
+    "diagnostics/puntaje_82.0.png",
+    "diagnostics/puntaje_54.0.png",
+    "diagnostics/puntaje_53.0.png",
+    "diagnostics/puntaje_59.0.png",
+    "diagnostics/puntaje_48.0.png",
+    "diagnostics/puntaje_85.0.png",
+    "diagnostics/puntaje_83.0.png",
+    "diagnostics/puntaje_56.0.png"
+  ]
+}
