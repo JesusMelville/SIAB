@@ -7,17 +7,24 @@ const connectDB = require('./config/db');
 
 dotenv.config();
 
-// 🔹 Conexión a MongoDB (si tienes MONGO_URI configurado)
+// 🔹 Conexión a MongoDB (usa process.env.MONGO_URI)
 connectDB();
 
 const app = express();
 
 // 1) CORS: permitir frontend local y frontend en Render
+const FRONTEND_URL = process.env.FRONTEND_URL; // ej: https://siab-frontend.onrender.com
+
 const allowedOrigins = [
-  'http://localhost:4200',            // Angular en tu PC
-  // ⚠️ REEMPLAZA ESTO por la URL real de tu frontend en Render:
-  // 'https://tu-frontend.onrender.com'
+  'http://localhost:4200', // Angular en tu PC
 ];
+
+if (FRONTEND_URL) {
+  allowedOrigins.push(FRONTEND_URL);
+  console.log('✅ FRONTEND_URL permitido en CORS:', FRONTEND_URL);
+} else {
+  console.warn('⚠️ FRONTEND_URL no definido. Solo se permite http://localhost:4200 en CORS.');
+}
 
 app.use(
   cors({
@@ -25,6 +32,7 @@ app.use(
       // permitir herramientas tipo Postman (sin origin)
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
+      console.warn('🚫 Origen no permitido por CORS:', origin);
       return callback(new Error('Origen no permitido por CORS: ' + origin), false);
     },
     credentials: true,
