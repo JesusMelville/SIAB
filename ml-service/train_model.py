@@ -98,7 +98,7 @@ TARGET = "TOTAL"
 # Después de cargar el DataFrame y antes de las estadísticas, agregar:
 def clean_total_column(df):
     # Extraer solo los números de la columna TOTAL
-    df['TOTAL'] = df['TOTAL'].astype(str).str.extract('(\d+\.?\d*)').astype(float)
+    df['TOTAL'] = df['TOTAL'].astype(str).str.extract(r'(\d+\.?\d*)').astype(float)
     return df
 
 # Limpiar los datos
