@@ -16,7 +16,7 @@ const app = express();
 const FRONTEND_URL = process.env.FRONTEND_URL; // ej: https://siab-frontend.onrender.com
 
 const allowedOrigins = [
-  'http://localhost:4200', // Angular en tu PC
+  'http://localhost:4200',
 ];
 
 if (FRONTEND_URL) {
@@ -25,6 +25,9 @@ if (FRONTEND_URL) {
 } else {
   console.warn('⚠️ FRONTEND_URL no definido. Solo se permite http://localhost:4200 en CORS.');
 }
+
+console.log('🌐 allowedOrigins:', allowedOrigins);
+
 
 app.use(
   cors({
